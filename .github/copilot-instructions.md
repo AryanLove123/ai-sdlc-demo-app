@@ -1,0 +1,1 @@
+Follow the project conventions, approval rules, test expectations and review expectations in `AGENTS.md` at the repository root. Read it before planning or editing. Do not invent files, methods or commands. Never claim a test passed unless you ran it and saw the output.
