@@ -35,7 +35,7 @@
 ## Risks / Trade-offs
 
 - [Risk] Changing the invoice before validating leaks into storage because repositories return live objects. → All checks first; tests compare the whole invoice before and after a denial.
-- [Risk] Admin loses approval authority, which changes today's behaviour. → Called out as BREAKING in the proposal; confirm before merging.
+- [Risk] `Approver` and `Admin` lose approval authority, which changes today's behaviour. → Called out as BREAKING in the proposal; confirm before merging.
 - [Risk] The first approval finalises the invoice by mistake. → Status becomes Approved only when the second approval is recorded; tested.
 - [Risk] Same-user and Director rules hide each other in tests. → Separate scenarios, with a different user for the Director test.
 - [Risk] A lock is process-wide and only valid for the in-memory store. → Accepted for this app; revisit if a database is added.
@@ -49,8 +49,7 @@
 
 ## Open Questions
 
-Assumptions taken as decided (change them here if the instructor says otherwise):
-- `Approver` = Manager; `Admin` cannot approve; any other role is denied.
+- Only `Manager` and `Director` may approve. `Approver` is retired, `Admin` cannot approve, and any other role is denied.
 - The first approver above 500,000 may be a Manager or a Director.
 - Limits apply to approving only.
 - A denied attempt is not recorded on the invoice.

@@ -6,7 +6,7 @@ The invoice approval flow does not enforce role-based approval limits. Today any
 
 ## What Changes
 
-- Add two approval roles, `Manager` and `Director`, with demo users for each. The legacy `Approver` role is treated as `Manager`.
+- Add two approval roles, `Manager` and `Director`, as the assignment defines them. The existing `Approver` role is retired: the `demo.approver` account is replaced by `demo.manager`, and `demo.director` and `demo.director2` are added.
 - Enforce limits at approval time: a Manager may approve up to and including 50,000; a Director up to and including 500,000.
 - Above 500,000, require two distinct approvers. The first may be a Manager or a Director. The second must be a Director. The invoice stays `PendingApproval` after the first approval and becomes `Approved` only when the second is recorded.
 - Compare approver usernames case-insensitively, so the same user never counts twice on one invoice.

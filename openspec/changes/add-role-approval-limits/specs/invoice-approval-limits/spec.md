@@ -7,7 +7,7 @@ Defines who may approve an invoice and when: limits by role and amount, a two-ap
 ## ADDED Requirements
 
 ### Requirement: Manager and Director limits are enforced by role and amount
-The system SHALL allow a Manager to approve an invoice up to and including 50,000 and a Director up to and including 500,000. The legacy `Approver` role SHALL be treated as `Manager`. Any other role, including `Admin`, SHALL be denied. A denial reason SHALL name the role and, where relevant, its limit.
+The system SHALL allow a Manager to approve an invoice up to and including 50,000 and a Director up to and including 500,000. Any other role, including `Admin` and the retired `Approver`, SHALL be denied. A denial reason SHALL name the role and, where relevant, its limit.
 
 #### Scenario: Manager approves exactly 50,000
 - **WHEN** a Manager approves a pending invoice of 50,000 that has no approvals
@@ -38,11 +38,6 @@ The system SHALL allow a Manager to approve an invoice up to and including 50,00
 - **THEN** the approval is denied with a reason that names the Manager role and the 50,000 limit
 - **AND** the invoice is unchanged
 
-#### Scenario: Legacy Approver is treated as Manager
-- **WHEN** a user with the role Approver approves a pending invoice of 50,000
-- **THEN** the invoice status becomes Approved
-- **WHEN** the same role approves a pending invoice of 50,001
-- **THEN** the approval is denied and that invoice is unchanged
 
 #### Scenario: A role that may not approve is denied
 - **WHEN** a user whose role is Admin, or any role other than Manager, Approver or Director, approves a pending invoice of any amount
