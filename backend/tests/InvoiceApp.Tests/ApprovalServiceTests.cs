@@ -184,16 +184,6 @@ public class ApprovalServiceTests
     }
 
     [Fact]
-    public void Approve_DirectorAt500001_IsDenied()
-    {
-        var invoice = PendingInvoice(500_001m);
-        var service = ServiceFor(invoice);
-
-        AssertDenied(invoice, "Invoices above 500,000 require two approvers (not yet supported).",
-            () => service.Approve("INV-1", "demo.director", ApprovalPolicy.DirectorRole));
-    }
-
-    [Fact]
     public void Approve_Admin_IsDenied()
     {
         var invoice = PendingInvoice(100m);
@@ -277,6 +267,179 @@ public class ApprovalServiceTests
         var before = Snapshot(invoice);
 
         var exception = Assert.Throws<InvalidOperationException>(() => service.Approve("INV-1", "demo.admin", "Admin"));
+
+        Assert.Equal("Invoice INV-1 is Approved; only pending invoices can be decided.", exception.Message);
+        AssertUnchanged(before, invoice);
+    }
+
+    [Fact]
+    public void Approve_DirectorFirstApprovalAbove500000_KeepsInvoicePending()
+    {
+        var invoice = PendingInvoice(500_001m);
+        var service = ServiceFor(invoice);
+
+        var result = service.Approve("INV-1", "demo.director", ApprovalPolicy.DirectorRole);
+
+        Assert.Equal(InvoiceStatus.PendingApproval, result.Status);
+        Assert.Null(result.DecidedBy);
+        Assert.Null(result.DecidedAt);
+        Assert.Null(result.DecisionNote);
+        Assert.Single(result.Approvals);
+        Assert.Equal("demo.director", result.Approvals[0].Approver);
+        Assert.Equal(ApprovalPolicy.DirectorRole, result.Approvals[0].Role);
+    }
+
+    [Fact]
+    public void Approve_ManagerFirstApprovalAbove500000_KeepsInvoicePending()
+    {
+        var invoice = PendingInvoice(600_000m);
+        var service = ServiceFor(invoice);
+
+        var result = service.Approve("INV-1", "demo.manager", ApprovalPolicy.ManagerRole);
+
+        Assert.Equal(InvoiceStatus.PendingApproval, result.Status);
+        Assert.Null(result.DecidedBy);
+        Assert.Null(result.DecidedAt);
+        Assert.Null(result.DecisionNote);
+        Assert.Single(result.Approvals);
+        Assert.Equal("demo.manager", result.Approvals[0].Approver);
+        Assert.Equal(ApprovalPolicy.ManagerRole, result.Approvals[0].Role);
+    }
+
+    [Fact]
+    public void Approve_ManagerThenDifferentDirectorAbove500000_CompletesApproval()
+    {
+        var invoice = PendingInvoice(600_000m);
+        var service = ServiceFor(invoice);
+
+        service.Approve("INV-1", "demo.manager", ApprovalPolicy.ManagerRole);
+        var result = service.Approve("INV-1", "demo.director", ApprovalPolicy.DirectorRole);
+
+        Assert.Equal(InvoiceStatus.Approved, result.Status);
+        Assert.Equal("demo.director", result.DecidedBy);
+        Assert.NotNull(result.DecidedAt);
+        Assert.Equal(2, result.Approvals.Count);
+        Assert.Equal("demo.manager", result.Approvals[0].Approver);
+        Assert.Equal(ApprovalPolicy.ManagerRole, result.Approvals[0].Role);
+        Assert.Equal("demo.director", result.Approvals[1].Approver);
+        Assert.Equal(ApprovalPolicy.DirectorRole, result.Approvals[1].Role);
+    }
+
+    [Fact]
+    public void Approve_DirectorThenDifferentDirectorAbove500000_CompletesApproval()
+    {
+        var invoice = PendingInvoice(600_000m);
+        var service = ServiceFor(invoice);
+
+        service.Approve("INV-1", "demo.director", ApprovalPolicy.DirectorRole);
+        var result = service.Approve("INV-1", "demo.director2", ApprovalPolicy.DirectorRole);
+
+        Assert.Equal(InvoiceStatus.Approved, result.Status);
+        Assert.Equal("demo.director2", result.DecidedBy);
+        Assert.NotNull(result.DecidedAt);
+        Assert.Equal(2, result.Approvals.Count);
+        Assert.Equal("demo.director", result.Approvals[0].Approver);
+        Assert.Equal(ApprovalPolicy.DirectorRole, result.Approvals[0].Role);
+        Assert.Equal("demo.director2", result.Approvals[1].Approver);
+        Assert.Equal(ApprovalPolicy.DirectorRole, result.Approvals[1].Role);
+    }
+
+    [Fact]
+    public void Approve_SameDirectorSecondApprovalAbove500000_IsDenied()
+    {
+        var invoice = PendingInvoice(600_000m);
+        var service = ServiceFor(invoice);
+        service.Approve("INV-1", "demo.director", ApprovalPolicy.DirectorRole);
+
+        AssertDenied(invoice, "User 'demo.director' has already approved invoice INV-1.",
+            () => service.Approve("INV-1", "demo.director", ApprovalPolicy.DirectorRole));
+    }
+
+    [Fact]
+    public void Approve_SameDirectorSecondApprovalDifferentCaseAbove500000_IsDenied()
+    {
+        var invoice = PendingInvoice(600_000m);
+        var service = ServiceFor(invoice);
+        service.Approve("INV-1", "demo.director", ApprovalPolicy.DirectorRole);
+
+        AssertDenied(invoice, "User 'DEMO.Director' has already approved invoice INV-1.",
+            () => service.Approve("INV-1", " DEMO.Director ", ApprovalPolicy.DirectorRole));
+    }
+
+    [Fact]
+    public void Approve_DifferentUserManagerSecondApprovalAbove500000_IsDenied()
+    {
+        var invoice = PendingInvoice(600_000m);
+        var service = ServiceFor(invoice);
+        service.Approve("INV-1", "demo.director", ApprovalPolicy.DirectorRole);
+
+        AssertDenied(invoice, "The second approver of an invoice above 500,000 must be a Director.",
+            () => service.Approve("INV-1", "demo.manager", ApprovalPolicy.ManagerRole));
+    }
+
+    [Fact]
+    public void Approve_SameManagerSecondApprovalAbove500000_UsesSameUserMessage()
+    {
+        var invoice = PendingInvoice(600_000m);
+        var service = ServiceFor(invoice);
+        service.Approve("INV-1", "demo.manager", ApprovalPolicy.ManagerRole);
+
+        AssertDenied(invoice, "User 'demo.manager' has already approved invoice INV-1.",
+            () => service.Approve("INV-1", "demo.manager", ApprovalPolicy.ManagerRole));
+    }
+
+    [Fact]
+    public void Approve_DeniedManagerSecondApprovalAbove500000_IsFollowedByValidDirectorApproval()
+    {
+        var invoice = PendingInvoice(600_000m);
+        var service = ServiceFor(invoice);
+        service.Approve("INV-1", "demo.director", ApprovalPolicy.DirectorRole);
+
+        AssertDenied(invoice, "The second approver of an invoice above 500,000 must be a Director.",
+            () => service.Approve("INV-1", "demo.manager", ApprovalPolicy.ManagerRole));
+
+        var result = service.Approve("INV-1", "demo.director2", ApprovalPolicy.DirectorRole);
+
+        Assert.Equal(InvoiceStatus.Approved, result.Status);
+        Assert.Equal("demo.director2", result.DecidedBy);
+        Assert.Equal(2, result.Approvals.Count);
+        Assert.Equal("demo.director", result.Approvals[0].Approver);
+        Assert.Equal(ApprovalPolicy.DirectorRole, result.Approvals[0].Role);
+        Assert.Equal("demo.director2", result.Approvals[1].Approver);
+        Assert.Equal(ApprovalPolicy.DirectorRole, result.Approvals[1].Role);
+    }
+
+    [Fact]
+    public void Approve_DeniedSameUserSecondApprovalAbove500000_IsFollowedByValidDirectorApproval()
+    {
+        var invoice = PendingInvoice(600_000m);
+        var service = ServiceFor(invoice);
+        service.Approve("INV-1", "demo.director", ApprovalPolicy.DirectorRole);
+
+        AssertDenied(invoice, "User 'demo.director' has already approved invoice INV-1.",
+            () => service.Approve("INV-1", "demo.director", ApprovalPolicy.DirectorRole));
+
+        var result = service.Approve("INV-1", "demo.director2", ApprovalPolicy.DirectorRole);
+
+        Assert.Equal(InvoiceStatus.Approved, result.Status);
+        Assert.Equal("demo.director2", result.DecidedBy);
+        Assert.Equal(2, result.Approvals.Count);
+        Assert.Equal("demo.director", result.Approvals[0].Approver);
+        Assert.Equal(ApprovalPolicy.DirectorRole, result.Approvals[0].Role);
+        Assert.Equal("demo.director2", result.Approvals[1].Approver);
+        Assert.Equal(ApprovalPolicy.DirectorRole, result.Approvals[1].Role);
+    }
+
+    [Fact]
+    public void Approve_ThirdApprovalAfterApprovalIsAlreadyComplete_ThrowsAndLeavesInvoiceUnchanged()
+    {
+        var invoice = PendingInvoice(600_000m);
+        var service = ServiceFor(invoice);
+        service.Approve("INV-1", "demo.director", ApprovalPolicy.DirectorRole);
+        service.Approve("INV-1", "demo.director2", ApprovalPolicy.DirectorRole);
+        var before = Snapshot(invoice);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => service.Approve("INV-1", "demo.director3", ApprovalPolicy.DirectorRole));
 
         Assert.Equal("Invoice INV-1 is Approved; only pending invoices can be decided.", exception.Message);
         AssertUnchanged(before, invoice);

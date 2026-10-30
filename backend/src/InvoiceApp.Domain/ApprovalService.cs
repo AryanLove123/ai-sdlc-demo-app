@@ -7,6 +7,7 @@ namespace InvoiceApp.Domain;
 /// </summary>
 public class ApprovalService
 {
+    private static readonly object ApprovalLock = new();
     private readonly IInvoiceRepository _repository;
 
     public ApprovalService(IInvoiceRepository repository)
@@ -31,24 +32,59 @@ public class ApprovalService
 
     public Invoice Approve(string invoiceId, string approver, string approverRole)
     {
-        var invoice = Find(invoiceId);
-        EnsurePending(invoice);
-
-        if (string.IsNullOrWhiteSpace(approver))
+        lock (ApprovalLock)
         {
-            throw new ArgumentException("Approver username is required.", nameof(approver));
+            var invoice = Find(invoiceId);
+            EnsurePending(invoice);
+
+            if (string.IsNullOrWhiteSpace(approver))
+            {
+                throw new ArgumentException("Approver username is required.", nameof(approver));
+            }
+
+            var trimmedApprover = approver.Trim();
+            ValidateRoleCanApprove(approverRole);
+
+            if (invoice.Amount <= ApprovalPolicy.DirectorLimit)
+            {
+                ValidateAmountCanApprove(approverRole, invoice.Amount);
+
+                var approvedAt = DateTime.UtcNow;
+                invoice.Status = InvoiceStatus.Approved;
+                invoice.DecidedBy = trimmedApprover;
+                invoice.DecidedAt = approvedAt;
+                invoice.Approvals.Add(new ApprovalRecord(trimmedApprover, approverRole, approvedAt));
+                _repository.Update(invoice);
+                return invoice;
+            }
+
+            if (invoice.Approvals.Count == 0)
+            {
+                invoice.Approvals.Add(new ApprovalRecord(trimmedApprover, approverRole, DateTime.UtcNow));
+                _repository.Update(invoice);
+                return invoice;
+            }
+
+            var firstApprover = invoice.Approvals[0].Approver;
+            if (string.Equals(trimmedApprover, firstApprover, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ApprovalDeniedException($"User '{trimmedApprover}' has already approved invoice {invoice.Id}.");
+            }
+
+            if (approverRole != ApprovalPolicy.DirectorRole)
+            {
+                throw new ApprovalDeniedException(
+                    "The second approver of an invoice above 500,000 must be a Director.");
+            }
+
+            var secondApprovedAt = DateTime.UtcNow;
+            invoice.Status = InvoiceStatus.Approved;
+            invoice.DecidedBy = trimmedApprover;
+            invoice.DecidedAt = secondApprovedAt;
+            invoice.Approvals.Add(new ApprovalRecord(trimmedApprover, approverRole, secondApprovedAt));
+            _repository.Update(invoice);
+            return invoice;
         }
-
-        ValidateRoleCanApprove(approverRole, invoice.Amount);
-
-        var trimmedApprover = approver.Trim();
-        var approvedAt = DateTime.UtcNow;
-        invoice.Status = InvoiceStatus.Approved;
-        invoice.DecidedBy = trimmedApprover;
-        invoice.DecidedAt = approvedAt;
-        invoice.Approvals.Add(new ApprovalRecord(trimmedApprover, approverRole, approvedAt));
-        _repository.Update(invoice);
-        return invoice;
     }
     public Invoice Reject(string invoiceId, string approver, string reason)
     {
@@ -81,19 +117,16 @@ public class ApprovalService
         }
     }
 
-    private static void ValidateRoleCanApprove(string approverRole, decimal invoiceAmount)
+    private static void ValidateRoleCanApprove(string approverRole)
     {
         if (approverRole != ApprovalPolicy.ManagerRole && approverRole != ApprovalPolicy.DirectorRole)
         {
             throw new ApprovalDeniedException($"Role '{approverRole}' may not approve invoices.");
         }
+    }
 
-        if (invoiceAmount > ApprovalPolicy.DirectorLimit)
-        {
-            throw new ApprovalDeniedException(
-                $"Invoices above {FormatAmount(ApprovalPolicy.DirectorLimit)} require two approvers (not yet supported).");
-        }
-
+    private static void ValidateAmountCanApprove(string approverRole, decimal invoiceAmount)
+    {
         var limit = approverRole == ApprovalPolicy.DirectorRole
             ? ApprovalPolicy.DirectorLimit
             : ApprovalPolicy.ManagerLimit;
