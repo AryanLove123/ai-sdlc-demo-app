@@ -1,3 +1,4 @@
+using System.Globalization;
 namespace InvoiceApp.Domain;
 
 /// <summary>
@@ -28,18 +29,27 @@ public class ApprovalService
         return invoice;
     }
 
-    public Invoice Approve(string invoiceId, string approver)
+    public Invoice Approve(string invoiceId, string approver, string approverRole)
     {
         var invoice = Find(invoiceId);
         EnsurePending(invoice);
 
+        if (string.IsNullOrWhiteSpace(approver))
+        {
+            throw new ArgumentException("Approver username is required.", nameof(approver));
+        }
+
+        ValidateRoleCanApprove(approverRole, invoice.Amount);
+
+        var trimmedApprover = approver.Trim();
+        var approvedAt = DateTime.UtcNow;
         invoice.Status = InvoiceStatus.Approved;
-        invoice.DecidedBy = approver;
-        invoice.DecidedAt = DateTime.UtcNow;
+        invoice.DecidedBy = trimmedApprover;
+        invoice.DecidedAt = approvedAt;
+        invoice.Approvals.Add(new ApprovalRecord(trimmedApprover, approverRole, approvedAt));
         _repository.Update(invoice);
         return invoice;
     }
-
     public Invoice Reject(string invoiceId, string approver, string reason)
     {
         if (string.IsNullOrWhiteSpace(reason))
@@ -70,4 +80,31 @@ public class ApprovalService
                 $"Invoice {invoice.Id} is {invoice.Status}; only pending invoices can be decided.");
         }
     }
+
+    private static void ValidateRoleCanApprove(string approverRole, decimal invoiceAmount)
+    {
+        if (approverRole != ApprovalPolicy.ManagerRole && approverRole != ApprovalPolicy.DirectorRole)
+        {
+            throw new ApprovalDeniedException($"Role '{approverRole}' may not approve invoices.");
+        }
+
+        if (invoiceAmount > ApprovalPolicy.DirectorLimit)
+        {
+            throw new ApprovalDeniedException(
+                $"Invoices above {FormatAmount(ApprovalPolicy.DirectorLimit)} require two approvers (not yet supported).");
+        }
+
+        var limit = approverRole == ApprovalPolicy.DirectorRole
+            ? ApprovalPolicy.DirectorLimit
+            : ApprovalPolicy.ManagerLimit;
+
+        if (invoiceAmount > limit)
+        {
+            throw new ApprovalDeniedException(
+                $"A {approverRole} may approve invoices up to {FormatAmount(limit)}.");
+        }
+    }
+
+    private static string FormatAmount(decimal amount) =>
+        amount.ToString("N0", CultureInfo.InvariantCulture);
 }
