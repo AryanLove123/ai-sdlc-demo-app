@@ -1,0 +1,24 @@
+schema: spec-driven
+githubCopilot:
+  cloudAgent: false
+
+context: |
+  .NET 10 invoice approval app. Business rules live in InvoiceApp.Domain, never in controllers.
+  Roles are Manager and Director. The legacy Approver role is treated as Manager. Admin has no approval authority.
+  Limits are inclusive: Manager up to 50,000; Director up to 500,000.
+  Above 500,000 two distinct approvers are needed: the first is a Manager or a Director, the second must be a Director.
+  The same user (compared case-insensitively) never counts twice on one invoice.
+  A denied attempt returns a clear reason (HTTP 403 with an error message) and changes nothing on the invoice.
+  Limits apply to approving only; reject is unchanged. Do not add new invoice status values.
+  A first approval above 500,000 keeps the status PendingApproval.
+
+rules:
+  specs:
+    - "Write a scenario for each boundary: exactly 50,000, just above 50,000, exactly 500,000, just above 500,000."
+    - "Include a same-user-twice scenario that starts from an invoice that already has one approval."
+    - "Include a non-Director second approver scenario that uses a different user than the first approver."
+    - "Every denial scenario must state that the invoice is unchanged."
+  tasks:
+    - "Split tasks into two groups. Group 1 is single-approver limits. Group 2 is the two-approver rule."
+    - "Group 2 must not start until Group 1 is complete and committed."
+    - "Each group ends with unit tests and a dotnet test run."

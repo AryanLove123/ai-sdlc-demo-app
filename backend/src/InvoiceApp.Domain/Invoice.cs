@@ -10,4 +10,5 @@ public class Invoice
     public string? DecidedBy { get; set; }
     public DateTime? DecidedAt { get; set; }
     public string? DecisionNote { get; set; }
+    public List<ApprovalRecord> Approvals { get; set; } = new();
 }

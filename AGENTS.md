@@ -35,7 +35,7 @@ Spec: `openspec/changes/add-role-approval-limits/`. Built in two increments, eac
 
 Assumptions (confirm in the spec if they change):
  
-- Role names are the strings `Manager` and `Director`. The legacy `Approver` role is treated as Manager. `Admin` has no approval authority. Any other role is denied.
+- Role names are the strings `Manager` and `Director`, matched exactly. The old `Approver` role is retired and denied. `Admin` has no approval authority. Any other role is denied.
 - Limits apply to approving only. Reject is unchanged.
 - A first approval above 500,000 keeps the status `PendingApproval`. Status becomes `Approved` only when the second approval lands. Do not add a new status value.
 - A denied attempt is not recorded anywhere on the invoice.
@@ -81,11 +81,13 @@ How a denial must behave:
 - Run the app: `dotnet run --project backend/src/InvoiceApp.Api` then open http://localhost:5000
 - Run the tests: `dotnet test backend/InvoiceApp.sln`
 - Run end-to-end tests: `cd e2e && npm install && npx playwright install chromium && npm test`
+- Mutation testing (Stryker 4.13.0, from `backend/tests/InvoiceApp.Tests`): `dotnet stryker --project InvoiceApp.Domain.csproj --mutate "**/ApprovalService.cs"`. Use the same scope for before and after runs.
 
 ## Demo accounts (not real credentials)
 
-- `demo.approver` / `ChangeMe123!` (role Approver)
+- `demo.approver` / `ChangeMe123!` (role Approver, retired by the role-limits feature and replaced by `demo.manager`)
 - `demo.admin` / `ChangeMe123!` (role Admin)
+- To be added with the feature: `demo.manager` (Manager, replaces `demo.approver`), `demo.director` and `demo.director2` (Director), same demo password.
 
 ## Never
 
