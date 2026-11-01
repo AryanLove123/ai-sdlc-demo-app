@@ -4,9 +4,9 @@
 
 **Repo (my fork):** https://github.com/AryanLove123/ai-sdlc-demo-app.git
 
-**Pull request:**
+**Pull request:** https://github.com/AryanLove123/ai-sdlc-demo-app/pull/1
 
-**Demo video link**
+**Demo video link** https://nagarro-my.sharepoint.com/:v:/p/lovekesh_arya/IQAHqCnDhfyrToz5Ff4P3DthAbASWISN56rXSug0ZE7whTg?nav=eyJyZWZlcnJhbEluZm8iOnsicmVmZXJyYWxBcHAiOiJPbmVEcml2ZUZvckJ1c2luZXNzIiwicmVmZXJyYWxBcHBQbGF0Zm9ybSI6IldlYiIsInJlZmVycmFsTW9kZSI6InZpZXciLCJyZWZlcnJhbFZpZXciOiJNeUZpbGVzTGlua0NvcHkifX0&e=2a9lhZ
 
 
 ## 1. Summary
